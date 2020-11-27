@@ -202,7 +202,7 @@ class App extends React.Component {
 
   handleRecorderStopped = async () => {
     const audioBlob = new Blob(this.audioChunks, {
-      type: "audio/wav; codecs=0",
+      type: "audio/wav",
     });
 
     // render audio player as user message
@@ -212,7 +212,7 @@ class App extends React.Component {
 
     // sender the audio blob to server
     let formData = new FormData();
-    formData.append("name", "webAudioBlob");
+    formData.append("name", "webBlobAudio");
     formData.append("file", audioBlob);
 
     try {
@@ -341,6 +341,7 @@ class App extends React.Component {
           );
           this.recorder.addEventListener("stop", this.handleListenerStopped);
 
+          console.log("Trying websocket connecting...");
           // start websocket connection
           this.ws = new WebSocket(WS_URL);
           let that = this;
@@ -355,13 +356,31 @@ class App extends React.Component {
             that.recorder.start(1000);
           };
           this.ws.onmessage = (event) => {
-            console.log(event.data);
+            const message = event.data;
+            console.log(message);
+            let user_input = document.getElementsByClassName(
+              "rcw-new-message"
+            )[0];
+            user_input.value = message;
           };
           this.ws.onerror = (event) => {
-            console.log(event.data);
+            if (event.data) {
+              console.log(event.data);
+            } else {
+              console.log("Websocket error on connecting.");
+            }
           };
           this.ws.onclose = () => {
             console.log("Websocket closed.");
+            if (that.state.listening || that.state.recording) {
+              console.log("Websocket closed by server.");
+              that.recorder.stop();
+              that.setState({ recording: false, listening: false });
+              setQuickButtons([
+                { label: "RECORD", value: 1 },
+                { label: "LISTEN", value: 2 },
+              ]);
+            }
           };
         } else {
           this.setState({ listening: false });
