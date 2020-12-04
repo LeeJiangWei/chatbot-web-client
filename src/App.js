@@ -1,6 +1,7 @@
 import React from "react";
 import axios from "axios";
 import ReactAplayer from "react-aplayer";
+import Recorder from "js-audio-recorder";
 
 import {
   renderCustomComponent,
@@ -282,8 +283,27 @@ class App extends React.Component {
       // value === 0: "stop" button clicked
       case 0:
         // if it is recording or listening, stop it
-        if (this.state.recording || this.state.listening) {
+        if (this.state.recording) {
           this.recorder.stop();
+        }
+        if (this.state.listening) {
+          clearInterval(this.intv);
+          this.recorder.stop();
+          const chunk = this.recorder.getNextData();
+          const blob = new Blob(chunk);
+
+          // sender the audio blob to server
+          try {
+            this.ws.send(this.recorder.getWAVBlob());
+          } catch (e) {
+            console.log("Error in final interval: ", e.toString());
+          }
+          this.ws.close(1000, "Normally closed by program.");
+
+          // release resources
+          this.recorder.destroy().then(() => {
+            this.recorder = null;
+          });
         }
         this.setState({ recording: false, listening: false });
         setQuickButtons([
@@ -327,19 +347,58 @@ class App extends React.Component {
       case 2:
         // if not listening, start to listen voice
         if (!this.state.listening) {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
+          // original
+          // const stream = await navigator.mediaDevices.getUserMedia({
+          //   audio: true,
+          // });
+          //
+          // this.audioChunks = [];
+          //
+          // // recorder event handlers
+          // this.recorder = new MediaRecorder(stream);
+          // this.recorder.addEventListener(
+          //   "dataavailable",
+          //   this.handleListenerDataAvailable
+          // );
+          // this.recorder.addEventListener("stop", this.handleListenerStopped);
 
-          this.audioChunks = [];
+          // recorder-js
+          //
+          // const stream = await navigator.mediaDevices.getUserMedia({
+          //   audio: true,
+          // });
+          //
+          // const audioContext = new (window.AudioContext ||
+          //   window.webkitAudioContext)();
+          //
+          // this.recorder = new Recorder(audioContext, {
+          //   onAnalysed: (data) => {
+          //     console.log(data);
+          //   },
+          // });
+          // this.recorder.init(stream);
+          //
+          // await this.recorder.start();
+          //
+          // setTimeout(() => {
+          //   this.recorder.stop().then(({ blob, buffer }) => {
+          //     console.log("Stop recording");
+          //     const audioUrl = URL.createObjectURL(blob);
+          //     this.renderAudioMessage(audioUrl, true);
+          //   });
+          // }, 5000);
 
-          // recorder event handlers
-          this.recorder = new MediaRecorder(stream);
-          this.recorder.addEventListener(
-            "dataavailable",
-            this.handleListenerDataAvailable
+          // js-audio-recorder
+          Recorder.getPermission().then(
+            () => {
+              console.log("Permission admitted.");
+            },
+            (error) => {
+              console.log(`${error.name} : ${error.message}`);
+            }
           );
-          this.recorder.addEventListener("stop", this.handleListenerStopped);
+
+          this.recorder = new Recorder();
 
           console.log("Trying websocket connecting...");
           // start websocket connection
@@ -348,13 +407,71 @@ class App extends React.Component {
           this.ws.onopen = () => {
             console.log("Websocket successfully opened.");
 
-            that.setState({ listening: true });
+            this.setState({ listening: true });
             setQuickButtons([{ label: "STOP", value: 0 }]);
             document.getElementsByClassName("quick-button")[0].className =
               "quick-button bd-red";
 
-            that.recorder.start(1000);
+            this.recorder.start().then(
+              () => {
+                this.intv = setInterval(() => {
+                  const blob = this.recorder.getWAVBlob();
+                  this.recorder.start();
+                  // sender the audio blob to server
+                  try {
+                    this.ws.send(blob);
+                  } catch (e) {
+                    console.log("Error in interval: ", e.toString());
+                  }
+                }, 1000);
+              },
+              (error) => {
+                // error when starting recording
+                console.log(`${error.name} : ${error.message}`);
+              }
+            );
           };
+
+          // js-audio-recorder 0.5.7
+          // Recorder.getPermission().then(
+          //   () => {
+          //     console.log("Permission admitted.");
+          //   },
+          //   (error) => {
+          //     console.log(`${error.name} : ${error.message}`);
+          //   }
+          // );
+          //
+          // this.ws = new WebSocket(WS_URL);
+          // let that = this;
+          // this.ws.onopen = () => {
+          //   console.log("Websocket successfully opened.");
+          //
+          //   this.setState({ listening: true });
+          //   setQuickButtons([{ label: "STOP", value: 0 }]);
+          //   document.getElementsByClassName("quick-button")[0].className =
+          //     "quick-button bd-red";
+          //
+          //   this.recorder = new Recorder({
+          //     sampleBits: 16,
+          //     sampleRate: 16000,
+          //     numChannels: 1,
+          //     compiling: true,
+          //   });
+          //
+          //   this.recorder.start().then(
+          //     () => {
+          //       this.intv = setInterval(() => {
+          //         const chunk = this.recorder.getNextData();
+          //         const blob = new Blob(chunk);
+          //         this.ws.send(blob);
+          //       }, 1000);
+          //     },
+          //     (error) => {
+          //       console.log(`${error.name} : ${error.message}`);
+          //     }
+          //   );
+          // };
           this.ws.onmessage = (event) => {
             const message = event.data;
             console.log(message);
@@ -372,10 +489,10 @@ class App extends React.Component {
           };
           this.ws.onclose = () => {
             console.log("Websocket closed.");
-            if (that.state.listening || that.state.recording) {
+            if (this.state.listening || this.state.recording) {
               console.log("Websocket closed by server.");
-              that.recorder.stop();
-              that.setState({ recording: false, listening: false });
+              this.recorder.stop();
+              this.setState({ recording: false, listening: false });
               setQuickButtons([
                 { label: "RECORD", value: 1 },
                 { label: "LISTEN", value: 2 },
