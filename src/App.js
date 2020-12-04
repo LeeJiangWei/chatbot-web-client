@@ -1,7 +1,7 @@
 import React from "react";
 import axios from "axios";
 import ReactAplayer from "react-aplayer";
-import Recorder from "js-audio-recorder";
+import Recorder from "recorder-js";
 
 import {
   renderCustomComponent,
@@ -363,74 +363,74 @@ class App extends React.Component {
           // this.recorder.addEventListener("stop", this.handleListenerStopped);
 
           // recorder-js
-          //
-          // const stream = await navigator.mediaDevices.getUserMedia({
-          //   audio: true,
-          // });
-          //
-          // const audioContext = new (window.AudioContext ||
-          //   window.webkitAudioContext)();
-          //
-          // this.recorder = new Recorder(audioContext, {
-          //   onAnalysed: (data) => {
-          //     console.log(data);
-          //   },
-          // });
-          // this.recorder.init(stream);
-          //
-          // await this.recorder.start();
-          //
-          // setTimeout(() => {
-          //   this.recorder.stop().then(({ blob, buffer }) => {
-          //     console.log("Stop recording");
-          //     const audioUrl = URL.createObjectURL(blob);
-          //     this.renderAudioMessage(audioUrl, true);
-          //   });
-          // }, 5000);
+
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: true,
+          });
+
+          const audioContext = new (window.AudioContext ||
+            window.webkitAudioContext)();
+
+          this.recorder = new Recorder(audioContext, {
+            onAnalysed: (data) => {
+              console.log(data);
+            },
+          });
+          this.recorder.init(stream);
+
+          await this.recorder.start();
+
+          setTimeout(() => {
+            this.recorder.stop().then(({ blob, buffer }) => {
+              console.log("Stop recording");
+              const audioUrl = URL.createObjectURL(blob);
+              this.renderAudioMessage(audioUrl, true);
+            });
+          }, 5000);
 
           // js-audio-recorder
-          Recorder.getPermission().then(
-            () => {
-              console.log("Permission admitted.");
-            },
-            (error) => {
-              console.log(`${error.name} : ${error.message}`);
-            }
-          );
-
-          this.recorder = new Recorder();
-
-          console.log("Trying websocket connecting...");
-          // start websocket connection
-          this.ws = new WebSocket(WS_URL);
-          let that = this;
-          this.ws.onopen = () => {
-            console.log("Websocket successfully opened.");
-
-            this.setState({ listening: true });
-            setQuickButtons([{ label: "STOP", value: 0 }]);
-            document.getElementsByClassName("quick-button")[0].className =
-              "quick-button bd-red";
-
-            this.recorder.start().then(
-              () => {
-                this.intv = setInterval(() => {
-                  const blob = this.recorder.getWAVBlob();
-                  this.recorder.start();
-                  // sender the audio blob to server
-                  try {
-                    this.ws.send(blob);
-                  } catch (e) {
-                    console.log("Error in interval: ", e.toString());
-                  }
-                }, 1000);
-              },
-              (error) => {
-                // error when starting recording
-                console.log(`${error.name} : ${error.message}`);
-              }
-            );
-          };
+          // Recorder.getPermission().then(
+          //   () => {
+          //     console.log("Permission admitted.");
+          //   },
+          //   (error) => {
+          //     console.log(`${error.name} : ${error.message}`);
+          //   }
+          // );
+          //
+          // this.recorder = new Recorder();
+          //
+          // console.log("Trying websocket connecting...");
+          // // start websocket connection
+          // this.ws = new WebSocket(WS_URL);
+          // let that = this;
+          // this.ws.onopen = () => {
+          //   console.log("Websocket successfully opened.");
+          //
+          //   this.setState({ listening: true });
+          //   setQuickButtons([{ label: "STOP", value: 0 }]);
+          //   document.getElementsByClassName("quick-button")[0].className =
+          //     "quick-button bd-red";
+          //
+          //   this.recorder.start().then(
+          //     () => {
+          //       this.intv = setInterval(() => {
+          //         const blob = this.recorder.getWAVBlob();
+          //         this.recorder.start();
+          //         // sender the audio blob to server
+          //         try {
+          //           this.ws.send(blob);
+          //         } catch (e) {
+          //           console.log("Error in interval: ", e.toString());
+          //         }
+          //       }, 1000);
+          //     },
+          //     (error) => {
+          //       // error when starting recording
+          //       console.log(`${error.name} : ${error.message}`);
+          //     }
+          //   );
+          // };
 
           // js-audio-recorder 0.5.7
           // Recorder.getPermission().then(
